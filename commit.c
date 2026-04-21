@@ -229,7 +229,56 @@ Commit *commit_parse(const unsigned char *data, size_t len) {
             break;
         }
         
+        // Parse header line
+        if (strncmp(text, "tree ", 5) == 0) {
+            sscanf(text + 5, "%64s", commit->tree);
+        } else if (strncmp(text, "parent ", 7) == 0) {
+            sscanf(text + 7, "%64s", commit->parent);
+        } else if (strncmp(text, "author ", 7) == 0) {
+            // author <name> <email> <timestamp>
+            const char *space1 = strchr(text + 7, ' ');
+            const char *space2 = strrchr(text, ' ');
+            if (space1 && space2) {
+                size_t name_len = space1 - (text + 7);
+                strncpy(commit->author_name, text + 7, name_len);
+                commit->author_name[name_len] = '\0';
+                
+                size_t email_len = space2 - space1 - 2;  // Skip "< "
+                strncpy(commit->author_email, space1 + 2, email_len - 1);
+                
+                sscanf(space2 + 1, "%ld", &commit->author_time);
+            }
+        }
+        
+        text = newline + 1;
+    }
+    
+    return commit;
+}
 
+/**
+ * commit_serialize: Convert Commit struct to text
+ * (PROVIDED - do not modify)
+ */
+unsigned char *commit_serialize(Commit *commit, size_t *len_out) {
+    char buffer[4096];
+    char *p = buffer;
+    
+    p += sprintf(p, "tree %s\n", commit->tree);
+    if (strlen(commit->parent) > 0) {
+        p += sprintf(p, "parent %s\n", commit->parent);
+    }
+    p += sprintf(p, "author %s <%s> %ld\n", commit->author_name, commit->author_email, commit->author_time);
+    p += sprintf(p, "committer %s <%s> %ld\n", commit->author_name, commit->author_email, commit->author_time);
+    p += sprintf(p, "\n%s", commit->message);
+    
+    size_t len = p - buffer;
+    unsigned char *result = malloc(len);
+    memcpy(result, buffer, len);
+    *len_out = len;
+    
+    return result;
+}
 
 /**
  * commit_walk: Walk commit history and call callback for each
