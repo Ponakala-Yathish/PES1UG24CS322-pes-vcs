@@ -144,8 +144,16 @@ char *tree_from_index(Index *index) {
         char path[1024];
         strcpy(path, entry->path);
         
-
-    
+        // Split path by '/'
+        char *last_slash = strrchr(path, '/');
+        
+        if (!last_slash) {
+            // File at root level
+            TreeEntry *te = &root->entries[root->count++];
+            te->mode = entry->mode;
+            strcpy(te->name, entry->path);
+            memcpy(te->hash, entry->hash, 32);
+        
     // Write root tree to object store
     size_t tree_len;
     unsigned char *tree_data = tree_serialize(root, &tree_len);
