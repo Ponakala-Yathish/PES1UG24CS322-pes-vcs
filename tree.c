@@ -153,7 +153,15 @@ char *tree_from_index(Index *index) {
             te->mode = entry->mode;
             strcpy(te->name, entry->path);
             memcpy(te->hash, entry->hash, 32);
-        
+        } else {
+            // File in subdirectory - need to create tree hierarchy
+            *last_slash = '\0';
+            char filename[256];
+            strcpy(filename, last_slash + 1);
+            
+            // Create intermediate trees if needed
+           
+    
     // Write root tree to object store
     size_t tree_len;
     unsigned char *tree_data = tree_serialize(root, &tree_len);
