@@ -54,7 +54,19 @@ char *object_write(const char *type, const void *data, size_t len) {
     
     // Write to temporary file first (atomic write pattern)
     char temp_path[512];
-    snprintf(temp_path, sizeof(temp_path), "%s/.tmp_%s", obj
+    snprintf(temp_path, sizeof(temp_path), "%s/.tmp_%s", obj_dir, hash_hex + 2);
+    
+    int fd = open(temp_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd < 0) {
+        perror("open temp file");
+        return NULL;
+    }
+    
+    if (write(fd, full_object, full_len) < 0) {
+        perror("write");
+        close(fd);
+        unlink(temp_path);
+        return NULL;
     }
     
     // Sync to disk before rename
@@ -64,7 +76,13 @@ char *object_write(const char *type, const void *data, size_t len) {
     // Atomically rename temp to final location
     char final_path[512];
     snprintf(final_path, sizeof(final_path), "%s/%s", obj_dir, hash_hex + 2);
-  
+    
+    if (rename(temp_path, final_path) < 0) {
+        perror("rename");
+        unlink(temp_path);
+        return NULL;
+    }
+    
     // Return allocated hash string
     char *result = malloc(65);
     strcpy(result, hash_hex);
