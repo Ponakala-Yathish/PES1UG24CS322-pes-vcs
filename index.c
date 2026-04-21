@@ -39,8 +39,11 @@ Index *index_load() {
         uint32_t size;
         char path[1024];
         
+        if (sscanf(line, "%o %64s %u %u %1023s", &mode, hash_hex, &mtime, &size, path) != 5) {
+            continue;  // Skip malformed lines
+        }
+        
       
-
 /**
  * index_save: Write index to .pes/index atomically
  * 
