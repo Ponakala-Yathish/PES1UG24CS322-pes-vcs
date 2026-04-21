@@ -25,8 +25,19 @@ char *object_write(const char *type, const void *data, size_t len) {
     char hash_hex[65];
     char header[256];
     
-   
-    }
+    // Build the header: "blob <size>" or "tree <size>" or "commit <size>"
+    int header_len = snprintf(header, sizeof(header), "%s %zu", type, len);
+    
+    // Full object = header + null byte + data
+    memcpy(full_object, header, header_len);
+    full_object[header_len] = '\0';
+    memcpy(full_object + header_len + 1, data, len);
+    size_t full_len = header_len + 1 + len;
+    
+    // Compute SHA-256 hash
+    SHA256(full_object, full_len, hash);
+    
+  
     
     // Sync to disk before rename
     fsync(fd);
