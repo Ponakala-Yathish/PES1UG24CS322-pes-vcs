@@ -160,7 +160,27 @@ char *tree_from_index(Index *index) {
             strcpy(filename, last_slash + 1);
             
             // Create intermediate trees if needed
-           
+            Tree *subtree = root;
+            char dir_path[1024] = "";
+            
+            char *saveptr;
+            char path_copy[1024];
+            strcpy(path_copy, path);
+            
+            char *component = strtok_r(path_copy, "/", &saveptr);
+            while (component) {
+                // TODO: Handle tree hierarchy recursively
+                // For now, simplified version
+                component = strtok_r(NULL, "/", &saveptr);
+            }
+            
+            // Add file to appropriate subtree
+            TreeEntry *te = &subtree->entries[subtree->count++];
+            te->mode = entry->mode;
+            strcpy(te->name, filename);
+            memcpy(te->hash, entry->hash, 32);
+        }
+    }
     
     // Write root tree to object store
     size_t tree_len;
