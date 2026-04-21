@@ -284,7 +284,34 @@ unsigned char *commit_serialize(Commit *commit, size_t *len_out) {
  * commit_walk: Walk commit history and call callback for each
  * (PROVIDED - do not modify)
  */
-
+void commit_walk(const char *start_hash, void (*callback)(Commit *)) {
+    if (!start_hash) return;
+    
+    char current_hash[65];
+    strcpy(current_hash, start_hash);
+    
+    while (strlen(current_hash) > 0) {
+        char type[64];
+        size_t len;
+        unsigned char *data = object_read(current_hash, type, &len);
+        
+        if (!data || strcmp(type, "commit") != 0) {
+            break;
+        }
+        
+        Commit *commit = commit_parse(data, len);
+        callback(commit);
+        
+        free(data);
+        
+        if (strlen(commit->parent) == 0) {
+            free(commit);
+            break;
+        }
+        
+        strcpy(current_hash, commit->parent);
+        free(commit);
+    }
 }
 
 /**
