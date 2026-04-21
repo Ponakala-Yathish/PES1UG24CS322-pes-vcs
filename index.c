@@ -43,7 +43,13 @@ Index *index_load() {
             continue;  // Skip malformed lines
         }
         
-      
+        // Add to index
+        index->count++;
+        index->entries = realloc(index->entries, index->count * sizeof(IndexEntry));
+        IndexEntry *entry = &index->entries[index->count - 1];
+        
+        
+
 /**
  * index_save: Write index to .pes/index atomically
  * 
