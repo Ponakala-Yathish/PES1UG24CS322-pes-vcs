@@ -139,6 +139,11 @@ char *tree_from_index(Index *index) {
           (int (*)(const void *, const void *))index_entry_cmp);
     
     // Process each index entry
+    for (int i = 0; i < index->count; i++) {
+        IndexEntry *entry = &index->entries[i];
+        char path[1024];
+        strcpy(path, entry->path);
+        
 
     
     // Write root tree to object store
