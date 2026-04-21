@@ -64,13 +64,7 @@ char *object_write(const char *type, const void *data, size_t len) {
     // Atomically rename temp to final location
     char final_path[512];
     snprintf(final_path, sizeof(final_path), "%s/%s", obj_dir, hash_hex + 2);
-    
-    if (rename(temp_path, final_path) < 0) {
-        perror("rename");
-        unlink(temp_path);
-        return NULL;
-    }
-    
+  
     // Return allocated hash string
     char *result = malloc(65);
     strcpy(result, hash_hex);
