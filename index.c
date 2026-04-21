@@ -55,7 +55,14 @@ Index *index_load() {
             sscanf(hash_hex + i * 2, "%2hhx", &entry->hash[i]);
         }
         
-       
+        entry->mtime = mtime;
+        entry->size = size;
+        strcpy(entry->path, path);
+    }
+    
+    fclose(f);
+    return index;
+}
 
 /**
  * index_save: Write index to .pes/index atomically
