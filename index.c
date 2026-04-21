@@ -48,7 +48,14 @@ Index *index_load() {
         index->entries = realloc(index->entries, index->count * sizeof(IndexEntry));
         IndexEntry *entry = &index->entries[index->count - 1];
         
+        entry->mode = mode;
         
+        // Convert hex hash to bytes
+        for (int i = 0; i < 32; i++) {
+            sscanf(hash_hex + i * 2, "%2hhx", &entry->hash[i]);
+        }
+        
+       
 
 /**
  * index_save: Write index to .pes/index atomically
