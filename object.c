@@ -37,7 +37,25 @@ char *object_write(const char *type, const void *data, size_t len) {
     // Compute SHA-256 hash
     SHA256(full_object, full_len, hash);
     
-  
+    // Convert hash to hex string
+    for (int i = 0; i < 32; i++) {
+        snprintf(hash_hex + i * 2, 3, "%02x", hash[i]);
+    }
+    hash_hex[64] = '\0';
+    
+    // Create .pes/objects directory if needed
+    mkdir(".pes", 0755);
+    mkdir(".pes/objects", 0755);
+    
+    // Create sharded directory: .pes/objects/XX/
+    char obj_dir[256];
+    snprintf(obj_dir, sizeof(obj_dir), ".pes/objects/%.2s", hash_hex);
+    mkdir(obj_dir, 0755);
+    
+    // Write to temporary file first (atomic write pattern)
+    char temp_path[512];
+    snprintf(temp_path, sizeof(temp_path), "%s/.tmp_%s", obj
+    }
     
     // Sync to disk before rename
     fsync(fd);
