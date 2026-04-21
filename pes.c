@@ -95,7 +95,65 @@ void cmd_commit(int argc, char *argv[]) {
  * commit_callback: Callback for commit_walk (used by cmd_log)
  * (PROVIDED - do not modify)
  */
+void commit_callback(Commit *commit) {
+    printf("commit %s\n", commit->parent);
+    printf("Author: %s <%s>\n", commit->author_name, commit->author_email);
+    
+    // Format timestamp
+    time_t t = commit->author_time;
+    struct tm *tm = localtime(&t);
+    printf("Date:   %s", asctime(tm));
+    
+    printf("\n    %s\n\n", commit->message);
+}
 
+/**
+ * cmd_log: Show commit history
+ * (PROVIDED - do not modify)
+ */
+void cmd_log() {
+    char *head = head_read();
+    if (!head) {
+        printf("fatal: not a valid repository or HEAD not found\n");
+        return;
+    }
+    
+    commit_walk(head, commit_callback);
+    free(head);
+}
+
+/**
+ * main: Entry point
+ * (PROVIDED - do not modify)
+ */
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "usage: pes <command> [<args>]\n");
+        fprintf(stderr, "commands:\n");
+        fprintf(stderr, "    init              Initialize repository\n");
+        fprintf(stderr, "    add <file>...     Stage files\n");
+        fprintf(stderr, "    status            Show status\n");
+        fprintf(stderr, "    commit -m <msg>   Create commit\n");
+        fprintf(stderr, "    log               Show history\n");
+        return 1;
+    }
+    
+    const char *cmd = argv[1];
+    
+    if (strcmp(cmd, "init") == 0) {
+        cmd_init();
+    } else if (strcmp(cmd, "add") == 0) {
+        cmd_add(argc, argv);
+    } else if (strcmp(cmd, "status") == 0) {
+        cmd_status();
+    } else if (strcmp(cmd, "commit") == 0) {
+        cmd_commit(argc, argv);
+    } else if (strcmp(cmd, "log") == 0) {
+        cmd_log();
+    } else {
+        fprintf(stderr, "error: unknown command '%s'\n", cmd);
+        return 1;
+    }
     
     return 0;
 }
