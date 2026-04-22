@@ -3,31 +3,32 @@
 // Compile and run:
 //   make test_tree
 //   ./test_tree
-
 #include "pes.h"
 #include "tree.h"
+#include "index.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
 
+// Forward declarations for object.c functions
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out);
+int object_exists(const ObjectID *id);
+
 void test_tree_roundtrip(void) {
     // Build a tree manually
     Tree original;
     original.count = 3;
-
     original.entries[0].mode = 0100644;
     memset(original.entries[0].hash.hash, 0xAA, HASH_SIZE);
     strcpy(original.entries[0].name, "README.md");
-
     original.entries[1].mode = 0040000;
     memset(original.entries[1].hash.hash, 0xBB, HASH_SIZE);
     strcpy(original.entries[1].name, "src");
-
     original.entries[2].mode = 0100755;
     memset(original.entries[2].hash.hash, 0xCC, HASH_SIZE);
     strcpy(original.entries[2].name, "build.sh");
-
     // Serialize
     void *data;
     size_t len;
@@ -36,28 +37,22 @@ void test_tree_roundtrip(void) {
     assert(data != NULL);
     assert(len > 0);
     printf("Serialized tree: %zu bytes\n", len);
-
     // Parse back
     Tree parsed;
     rc = tree_parse(data, len, &parsed);
     assert(rc == 0);
     assert(parsed.count == 3);
-
     // Verify entries are sorted by name (tree_serialize must sort)
     assert(strcmp(parsed.entries[0].name, "README.md") == 0);
-    assert(strcmp(parsed.entries[1].name, "build.sh") == 0);
-    assert(strcmp(parsed.entries[2].name, "src") == 0);
-
-    // Verify modes preserved
-    assert(parsed.entries[0].mode == 0100644);
-    assert(parsed.entries[1].mode == 0100755);
-    assert(parsed.entries[2].mode == 0040000);
-
+    assert(strcmp(parsed.entries[1].name, "build.sh")  == 0);
+    assert(strcmp(parsed.entries[2].name, "src")       == 0);
+    // Verify modes preserved (after sort)
+    assert(parsed.entries[0].mode == 0100644);  // README.md
+    assert(parsed.entries[1].mode == 0100755);  // build.sh
+    assert(parsed.entries[2].mode == 0040000);  // src
     // Verify hashes preserved
     assert(memcmp(parsed.entries[0].hash.hash, original.entries[0].hash.hash, HASH_SIZE) == 0);
-
     free(data);
-
     printf("PASS: tree serialize/parse roundtrip\n");
 }
 
@@ -66,7 +61,6 @@ void test_tree_determinism(void) {
     Tree tree_a, tree_b;
     tree_a.count = 2;
     tree_b.count = 2;
-
     // tree_a: entries in order z, a
     tree_a.entries[0].mode = 0100644;
     memset(tree_a.entries[0].hash.hash, 0x11, HASH_SIZE);
@@ -74,7 +68,6 @@ void test_tree_determinism(void) {
     tree_a.entries[1].mode = 0100644;
     memset(tree_a.entries[1].hash.hash, 0x22, HASH_SIZE);
     strcpy(tree_a.entries[1].name, "a_file.txt");
-
     // tree_b: entries in order a, z
     tree_b.entries[0].mode = 0100644;
     memset(tree_b.entries[0].hash.hash, 0x22, HASH_SIZE);
@@ -82,29 +75,73 @@ void test_tree_determinism(void) {
     tree_b.entries[1].mode = 0100644;
     memset(tree_b.entries[1].hash.hash, 0x11, HASH_SIZE);
     strcpy(tree_b.entries[1].name, "z_file.txt");
-
     void *data_a, *data_b;
     size_t len_a, len_b;
     tree_serialize(&tree_a, &data_a, &len_a);
     tree_serialize(&tree_b, &data_b, &len_b);
-
     assert(len_a == len_b);
     assert(memcmp(data_a, data_b, len_a) == 0);
-
     free(data_a);
     free(data_b);
-
     printf("PASS: tree deterministic serialization\n");
+}
+
+void test_tree_from_index(void) {
+    // Create a simple index with nested paths
+    Index index;
+    index.count = 0;
+
+    // Entry 1: README.md
+    IndexEntry *e = &index.entries[index.count++];
+    e->mode = 0100644;
+    memset(e->hash.hash, 0x11, HASH_SIZE);
+    strcpy(e->path, "README.md");
+    
+    // Entry 2: src/main.c
+    e = &index.entries[index.count++];
+    e->mode = 0100644;
+    memset(e->hash.hash, 0x22, HASH_SIZE);
+    strcpy(e->path, "src/main.c");
+    
+    // Entry 3: src/lib/util.c
+    e = &index.entries[index.count++];
+    e->mode = 0100644;
+    memset(e->hash.hash, 0x33, HASH_SIZE);
+    strcpy(e->path, "src/lib/util.c");
+
+    // Build tree hierarchy and write to object store
+    ObjectID root_id;
+    int rc = tree_from_index(&index, &root_id);
+    assert(rc == 0);
+    
+    // Verify objects were written
+    assert(object_exists(&root_id));
+    
+    // Read back the root tree
+    ObjectType type;
+    void *data;
+    size_t len;
+    rc = object_read(&root_id, &type, &data, &len);
+    assert(rc == 0);
+    assert(type == OBJ_TREE);
+    
+    // Parse and verify structure
+    Tree root_tree;
+    rc = tree_parse(data, len, &root_tree);
+    assert(rc == 0);
+    assert(root_tree.count >= 2);  // README.md and src/
+    
+    free(data);
+    printf("PASS: tree_from_index builds hierarchy\n");
 }
 
 int main(void) {
     int rc __attribute__((unused));
     rc = system("rm -rf .pes");
     rc = system("mkdir -p .pes/objects .pes/refs/heads");
-
     test_tree_roundtrip();
     test_tree_determinism();
-
+    test_tree_from_index();
     printf("\nAll Phase 2 tests passed.\n");
     return 0;
 }

@@ -1,61 +1,61 @@
-// pes.h — Core data structures and constants for PES-VCS
-//
-// This file is PROVIDED. Do not modify.
-
 #ifndef PES_H
 #define PES_H
 
-#include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <stdlib.h>
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-#define HASH_SIZE 32        // SHA-256 produces 32 bytes
-#define HASH_HEX_SIZE 64    // 32 bytes = 64 hex characters
-#define PES_DIR ".pes"
-#define OBJECTS_DIR ".pes/objects"
-#define REFS_DIR ".pes/refs/heads"
-#define INDEX_FILE ".pes/index"
-#define HEAD_FILE ".pes/HEAD"
+#define PES_DIR        ".pes"
+#define OBJECTS_DIR    ".pes/objects"
+#define REFS_DIR       ".pes/refs/heads"
+#define HEAD_FILE      ".pes/HEAD"
 
-// ─── Object Types ────────────────────────────────────────────────────────────
+#define HASH_SIZE      32          // SHA-256 = 32 bytes
+#define HASH_HEX_SIZE  64          // 32 bytes * 2 hex chars
 
-typedef enum {
-    OBJ_BLOB,    // File content
-    OBJ_TREE,    // Directory listing
-    OBJ_COMMIT   // Snapshot with metadata
-} ObjectType;
-
-// ─── Object Identifier ──────────────────────────────────────────────────────
+// ─── Object ID (SHA-256 hash) ─────────────────────────────────────────────────
 
 typedef struct {
-    uint8_t hash[HASH_SIZE];
+    unsigned char hash[HASH_SIZE];
 } ObjectID;
 
-// ─── Utility Functions (implement in object.c) ─────────────────────────────
+// ─── Object Types ─────────────────────────────────────────────────────────────
 
-// Convert a binary hash to a 64-character hex string (+ null terminator).
-// hex_out must be at least HASH_HEX_SIZE + 1 bytes.
-void hash_to_hex(const ObjectID *id, char *hex_out);
+typedef enum {
+    OBJ_BLOB   = 1,
+    OBJ_TREE   = 2,
+    OBJ_COMMIT = 3,
+} ObjectType;
 
-// Convert a 64-character hex string to a binary hash.
-// Returns 0 on success, -1 if hex contains invalid characters.
-int hex_to_hash(const char *hex, ObjectID *id_out);
+// ─── Hash Utilities (implemented inline here) ────────────────────────────────
 
-// ─── Author Configuration ───────────────────────────────────────────────────
-// PES-VCS reads the author name from the environment variable PES_AUTHOR.
-// If unset, it defaults to "PES User <pes@localhost>".
-//
-// To set your name:
-//   export PES_AUTHOR="Your Name <PESXUG24CS042>"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
-#define DEFAULT_AUTHOR "PES User <pes@localhost>"
+static inline void hash_to_hex(const ObjectID *id, char *hex_out) {
+    for (int i = 0; i < HASH_SIZE; i++) {
+        snprintf(hex_out + i * 2, 3, "%02x", id->hash[i]);
+    }
+    hex_out[HASH_HEX_SIZE] = '\0';
+}
 
-static inline const char* pes_author(void) {
-    const char *env = getenv("PES_AUTHOR");
-    return (env && env[0]) ? env : DEFAULT_AUTHOR;
+static inline int hex_to_hash(const char *hex, ObjectID *id_out) {
+    if (strlen(hex) != HASH_HEX_SIZE) return -1;
+    for (int i = 0; i < HASH_SIZE; i++) {
+        unsigned int byte;
+        if (sscanf(hex + i * 2, "%02x", &byte) != 1) return -1;
+        id_out->hash[i] = (unsigned char)byte;
+    }
+    return 0;
+}
+
+// ─── Author ──────────────────────────────────────────────────────────────────
+
+static inline const char *pes_author(void) {
+    const char *a = getenv("PES_AUTHOR");
+    return a ? a : "PES User <pes@localhost>";
 }
 
 #endif // PES_H

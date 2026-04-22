@@ -1,7 +1,7 @@
 // test_objects.c — Phase 1 test program
 //
 // Compile and run:
-//   gcc -Wall -Wextra -O2 -o test_objects test_objects.c object.c -lcrypto
+//   make test_objects
 //   ./test_objects
 
 #include "pes.h"
@@ -19,7 +19,6 @@ void object_path(const ObjectID *id, char *path_out, size_t path_size);
 void test_blob_storage(void) {
     const char *content = "Hello, PES-VCS!\n";
     ObjectID id;
-
     int rc = object_write(OBJ_BLOB, content, strlen(content), &id);
     assert(rc == 0);
 
@@ -48,12 +47,9 @@ void test_blob_storage(void) {
 void test_deduplication(void) {
     const char *content = "Duplicate content\n";
     ObjectID id1, id2;
-
     object_write(OBJ_BLOB, content, strlen(content), &id1);
     object_write(OBJ_BLOB, content, strlen(content), &id2);
-
     assert(memcmp(&id1, &id2, sizeof(ObjectID)) == 0);
-
     printf("PASS: deduplication\n");
 }
 

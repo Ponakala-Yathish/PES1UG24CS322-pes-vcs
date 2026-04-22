@@ -1,41 +1,46 @@
-// tree.h — Tree object interface
-//
-// A tree object represents a directory snapshot. Each entry maps a name
-// to either a blob (file) or another tree (subdirectory), along with
-// the file mode (permissions + type).
-
 #ifndef TREE_H
 #define TREE_H
-
+#include "pes.h"
+#include "index.h"  // ← ADD THIS LINE
 #include "pes.h"
 
+// Maximum entries in a single tree (generous limit)
 #define MAX_TREE_ENTRIES 1024
 
+// ─── Tree Entry ───────────────────────────────────────────────────────────────
+// Represents one entry in a tree object: a file (blob) or directory (tree).
+
 typedef struct {
-    uint32_t mode;          // 100644 (regular), 100755 (executable), 040000 (directory)
-    ObjectID hash;          // SHA-256 of the blob or subtree
-    char name[256];         // Entry name (filename or directory name, no path separators)
+    uint32_t  mode;               // 0100644, 0100755, or 0040000
+    char      name[256];          // Filename (not full path)
+    ObjectID  hash;               // Hash of the blob or subtree
 } TreeEntry;
+
+// ─── Tree ─────────────────────────────────────────────────────────────────────
 
 typedef struct {
     TreeEntry entries[MAX_TREE_ENTRIES];
-    int count;
+    int       count;
 } Tree;
 
-// Parse raw tree object data (as read from the object store) into a Tree struct.
+// ─── Function Declarations ────────────────────────────────────────────────────
+
+// Parse binary tree data into a Tree struct.
 int tree_parse(const void *data, size_t len, Tree *tree_out);
 
-// Serialize a Tree struct into raw bytes suitable for object_write(OBJ_TREE, ...).
-// Entries MUST be sorted by name before serialization.
+// Serialize a Tree struct to binary format. Sorts entries by name first.
 // Caller must free(*data_out).
 int tree_serialize(const Tree *tree, void **data_out, size_t *len_out);
 
-// Build a Tree from the current index contents.
-// This is what `pes commit` uses: it reads the index and constructs a tree
-// hierarchy that represents the staged snapshot. For nested paths
-// (e.g., "src/main.c"), this function must create subtrees.
-// Writes all tree objects to the object store.
-// Returns the root tree's ObjectID in *id_out.
-int tree_from_index(ObjectID *id_out);
+// Build a tree hierarchy from the index and write all trees to the object store.
+// Returns 0 and sets *root_id_out to the root tree's hash on success, -1 on error.
+int tree_from_index(struct Index *index, ObjectID *root_id_out);
+
+// Compare two TreeEntry structs by name (for qsort).
+int tree_entry_cmp(const void *a, const void *b);
+
+// Free a dynamically allocated tree (not needed for stack-allocated trees,
+// but provided for consistency).
+void tree_free(Tree *tree);
 
 #endif // TREE_H

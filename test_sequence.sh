@@ -1,80 +1,85 @@
 #!/usr/bin/env bash
-#
 # test_sequence.sh — End-to-end integration test for PES-VCS
-#
-# Run from the repository root after compiling:
-#   make
-#   ./test_sequence.sh
+set -e
 
-set -euo pipefail
+PASS=0
+FAIL=0
 
-PES="$(cd "$(dirname "$0")" && pwd)/pes"
-TEST_DIR="$(mktemp -d)"
-
-cleanup() {
-    rm -rf "$TEST_DIR"
+check() {
+    local desc="$1"
+    local expected="$2"
+    local actual="$3"
+    if echo "$actual" | grep -qF "$expected"; then
+        echo "PASS: $desc"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL: $desc"
+        echo "  Expected to find: $expected"
+        echo "  Got: $actual"
+        FAIL=$((FAIL + 1))
+    fi
 }
-trap cleanup EXIT
 
-cd "$TEST_DIR"
+# Clean slate
+rm -rf .pes test_file*.txt bye.txt hello.txt
 
-echo "=== PES-VCS Integration Test ==="
+# Init
+OUT=$(./pes init)
+check "init creates .pes" "Initialized empty PES repository" "$OUT"
+[ -f .pes/HEAD ] || { echo "FAIL: HEAD file missing"; exit 1; }
+
+# Add files
+echo "Hello" > hello.txt
+echo "World" > world.txt
+./pes add hello.txt
+./pes add world.txt
+
+# Status
+OUT=$(./pes status)
+check "status shows staged hello.txt" "hello.txt" "$OUT"
+check "status shows staged world.txt" "world.txt" "$OUT"
+
+# First commit
+OUT=$(./pes commit -m "Initial commit")
+check "first commit succeeds" "Committed:" "$OUT"
+
+# Second commit
+echo "More text" >> hello.txt
+./pes add hello.txt
+OUT=$(./pes commit -m "Add more text")
+check "second commit succeeds" "Committed:" "$OUT"
+
+# Third commit
+echo "Goodbye" > bye.txt
+./pes add bye.txt
+OUT=$(./pes commit -m "Add farewell")
+check "third commit succeeds" "Committed:" "$OUT"
+
+# Log
+OUT=$(./pes log)
+check "log shows Initial commit"  "Initial commit"  "$OUT"
+check "log shows Add more text"   "Add more text"   "$OUT"
+check "log shows Add farewell"    "Add farewell"    "$OUT"
+
+# HEAD and refs
+HEAD_CONTENT=$(cat .pes/HEAD)
+check "HEAD is symbolic ref" "ref: refs/heads/main" "$HEAD_CONTENT"
+[ -f .pes/refs/heads/main ] || { echo "FAIL: refs/heads/main missing"; FAIL=$((FAIL+1)); }
+
+# Object store exists and is non-empty
+OBJ_COUNT=$(find .pes/objects -type f 2>/dev/null | wc -l)
+if [ "$OBJ_COUNT" -ge 6 ]; then
+    echo "PASS: object store has $OBJ_COUNT objects (≥6 expected)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL: object store has only $OBJ_COUNT objects (expected ≥6)"
+    FAIL=$((FAIL + 1))
+fi
+
+# Cleanup
+rm -f hello.txt world.txt bye.txt
+
 echo ""
-
-# ── Init ───────────────────────────────────────────────────────────────────
-echo "--- Repository Initialization ---"
-$PES init
-[ -d .pes/objects ] && echo "PASS: .pes/objects exists" || echo "FAIL: .pes/objects missing"
-[ -d .pes/refs/heads ] && echo "PASS: .pes/refs/heads exists" || echo "FAIL: .pes/refs/heads missing"
-[ -f .pes/HEAD ] && echo "PASS: .pes/HEAD exists" || echo "FAIL: .pes/HEAD missing"
-echo ""
-
-# ── Add and Status ─────────────────────────────────────────────────────────
-echo "--- Staging Files ---"
-echo "version 1" > file.txt
-echo "hello world" > hello.txt
-$PES add file.txt hello.txt
-echo "Status after add:"
-$PES status
-echo ""
-
-# ── First Commit ───────────────────────────────────────────────────────────
-echo "--- First Commit ---"
-$PES commit -m "Initial commit"
-echo ""
-echo "Log after first commit:"
-$PES log
-echo ""
-
-# ── Modify and Recommit ───────────────────────────────────────────────────
-echo "--- Second Commit ---"
-echo "version 2" >> file.txt
-$PES add file.txt
-$PES commit -m "Update file.txt"
-echo ""
-
-# ── Third Commit ──────────────────────────────────────────────────────────
-echo "--- Third Commit ---"
-echo "goodbye" > bye.txt
-$PES add bye.txt
-$PES commit -m "Add farewell"
-echo ""
-
-echo "--- Full History ---"
-$PES log
-echo ""
-
-echo "--- Reference Chain ---"
-echo "HEAD:"
-cat .pes/HEAD
-echo "refs/heads/main:"
-cat .pes/refs/heads/main
-echo ""
-
-echo "--- Object Store ---"
-echo "Objects created:"
-find .pes/objects -type f | wc -l
-find .pes/objects -type f | sort
-echo ""
-
-echo "=== All integration tests completed ==="
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ] && echo "All integration tests passed!" && exit 0
+exit 1
